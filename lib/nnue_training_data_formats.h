@@ -61,8 +61,6 @@ THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define POCKETS false
 #define KING_SQUARES 1
 
-static_assert(DATA_SIZE % 8 == 0);
-
 namespace chess
 {
     #if defined(__clang__) || defined(__GNUC__) || defined(__GNUG__)
@@ -292,13 +290,13 @@ namespace chess
 
     struct Board
     {
-        Board() noexcept :
+        constexpr Board() noexcept :
             m_pieces{},
             m_pocketCount{},
             m_pieceCount{},
             m_kings{}
         {
-            std::fill_n(m_pieces, static_cast<uint8_t>(Square::NB), Piece::None);
+            std::fill_n(m_pieces, uint(Square::NB), Piece::None);
         }
 
         constexpr void place(Piece piece, Square sq)
@@ -306,7 +304,7 @@ namespace chess
             if (type_of(piece) == PieceType::King)
             {
                 m_kings[static_cast<uint8_t>(color_of(piece))] = sq;
-                assert(sq != Square::NB || KING_SQUARES == 1);
+                assert((sq == Square::NB) == (KING_SQUARES == 1));
                 if (sq == Square::NB)
                     // No king
                     return;
@@ -347,10 +345,10 @@ namespace chess
         const Piece* piecesRaw() const;
 
     private:
-        Piece m_pieces[(unsigned int)(Square::NB)];
-        uint8_t m_pocketCount[(unsigned int)(Piece::NB)];
+        Piece m_pieces[uint(Square::NB)];
+        uint8_t m_pocketCount[uint(Piece::NB)];
         uint8_t m_pieceCount;
-        Square m_kings[(unsigned int)(Color::NB)];
+        Square m_kings[uint(Color::NB)];
     };
 
 
@@ -358,7 +356,7 @@ namespace chess
     {
         using BaseType = Board;
 
-        Position() noexcept :
+        constexpr Position() noexcept :
             Board(),
             m_sideToMove(Color::White),
             m_epSquare(Square::NB),
@@ -496,7 +494,7 @@ namespace binpack
 
         struct PackedSfen
         {
-            uint8_t data[DATA_SIZE / 8];
+            uint8_t data[64];
         };
 
         struct PackedSfenValue
@@ -526,7 +524,7 @@ namespace binpack
 
             // 32 + 2 + 2 + 2 + 1 + 1 = 40bytes
         };
-        static_assert(sizeof(PackedSfenValue) == DATA_SIZE / 8 + 8);
+        static_assert(sizeof(PackedSfenValue) == 72);
         // Class that handles bitstream
 
         // useful when doing aspect encoding
@@ -707,13 +705,13 @@ namespace binpack
                         if (pc != chess::Piece::None)
                             pos.place(pc, sq);
                     }
-                    assert(stream.get_cursor() <= DATA_SIZE);
+                    assert(stream.get_cursor() <= 512);
                 }
             }
 
             for (chess::Color c : { chess::Color::White, chess::Color::Black })
                 for (chess::PieceType pt = chess::PieceType::Pawn; pt <= chess::PieceType::MaxPiece; ++pt)
-                    pos.setHandCount(make_piece(pt, c), static_cast<int>(stream.read_n_bit(DATA_SIZE > 512 ? 7 : 5)));
+                    pos.setHandCount(make_piece(pt, c), static_cast<int>(stream.read_n_bit(5)));
 
             // Castling availability.
             chess::CastlingRights cr = chess::CastlingRights::None;
@@ -756,7 +754,7 @@ namespace binpack
             pos.setFullMove(fullmove);
             pos.setRule50Counter(rule50);
 
-            assert(stream.get_cursor() <= DATA_SIZE);
+            assert(stream.get_cursor() <= 512);
 
             return pos;
         }
